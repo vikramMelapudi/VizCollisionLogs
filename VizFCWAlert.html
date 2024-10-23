@@ -1,0 +1,210 @@
+<html>
+    <head>
+        <style> 
+        </style>
+        <script src="allAlerts.js"></script>
+        <script>
+            var elInfo, elRange, ctx, data, ntim, atim, adata;
+            var W=470, H=280; // display size
+            var oW=1890, oH=1080; // original image size
+            var scx = W*1.0/oW;
+            var scy = H*1.0/oH;
+            
+            function keyListener(e) {
+                console.info(e+","+e.key);
+                if(e.key=="a" || e.key=="A") { document.getElementById("toggleAnim").checked = !document.getElementById("toggleAnim").checked; toggleAnim();}
+                if(e.key=='n' || e.key=="N") { var el=document.getElementById("nfil"); el.value = parseInt(el.value)+1; loadEntry(); }
+                if(e.key=='p' || e.key=="P") { var el=document.getElementById("nfil"); el.value = parseInt(el.value)-1; loadEntry(); }
+            }
+
+            function init() {
+                ctx = document.getElementById("canvas2d").getContext("2d");
+                elInfo = document.getElementById("info");
+                elRange = document.getElementById("range");
+                document.getElementById("totalEntries").innerHTML = '/ '+allAlerts.length;   
+                document.getElementById("nfil").max = allAlerts.length-1;
+                loadEntry();
+                document.getElementsByTagName("body")[0].addEventListener("keydown",keyListener);
+            }
+            
+            function runSim(startAnim=0) {
+                var input = document.getElementById("data").value;
+                data = JSON.parse(input);
+                data = parseData();
+                elRange.max = data.length-1;
+                elRange.value = 0;
+                elRange.disabled = false;
+                ntim = 0;
+                drawOne();
+                if(startAnim) {
+                    elRange.disabled = true;
+                    atim = setTimeout(anim,100);
+                }
+            }
+
+            function drawOutline(x1, y1, x2, y2) {
+                ctx.strokeStyle = "blue";
+                x1 = Math.round(x1*scx);
+                y1 = Math.round(y1*scy);
+                x2 = Math.round(x2*scx);
+                y2 = Math.round(y2*scy);
+                // elInfo.innerHTML += ', rect=' + [x1,y1,x2,y2];
+
+                ctx.strokeRect(x1,y1,x2-x1,y2-y1);   
+            }
+            function drawFill(x1, y1, x2, y2) {
+                ctx.fillStyle = "red";
+                x1 = Math.round(x1*scx);
+                y1 = Math.round(y1*scy);
+                x2 = Math.round(x2*scx);
+                y2 = Math.round(y2*scy);
+                // elInfo.innerHTML += ', rect=' + [x1,y1,x2,y2];
+
+                ctx.fillRect(x1,y1,x2-x1,y2-y1);
+
+                ctx.strokeStyle = "black";
+                ctx.strokeRect(x1,y1,x2-x1,y2-y1); 
+            }
+
+            function parseBBox(txt) {
+                var tt = txt.split('-')[0].replace('(','').replace(')','').split(',');
+                var xys= [];
+                for(var n=0;n<4;n++) xys.push(parseInt(tt[n]));
+                return xys;
+            }
+
+            function parseData() {
+                var tmpData = [];
+                // console.info(data);
+                // console.info(data.length);
+                for(var n=data.length-1; n>=0; n--) {
+                    var splits = data[n]['value'].split('|');
+                    var bboxes = [];
+                    for(var nbox=2; nbox<splits.length; nbox++) bboxes.push(parseBBox(splits[nbox]));
+                    var ct = getTime(n);
+                    var info = [ct, bboxes, data[n]['speed'], data[n]['distance'], parseFloat(splits[0])];
+                    tmpData.push(info);
+                    // console.info(tmpData.length);
+                }
+                return tmpData;
+            }
+
+            function getTime(ntim) {
+                return parseFloat(data[ntim]['time']['seconds']+'.'+data[ntim]['time']['nanos']);
+            }
+
+            function drawBasicScene(nstep=0) {
+                ctx.fillStyle = "lightblue";
+                ctx.fillRect(0,0,W+10,H/2);
+                ctx.fillStyle = "lightgreen";
+                ctx.fillRect(0,H/2,W+10,H/2);
+                ctx.fillStyle = "gray";
+                
+                ctx.beginPath();
+                var xys = [[W/2-100,H], [W/2-20,H/2], [W/2+20,H/2], [W/2+100,H]];
+                for(var nxy=0; nxy<xys.length; nxy++) {
+                    ctx.lineTo(xys[nxy][0], xys[nxy][1]);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // draw 2 rows of trees
+                for(var treeRow=0; treeRow<2; treeRow++) {
+                    var lx = [W/2-20, W/2-150];
+                    var ly = [H/2, H];
+                    var xoff = -20;
+                    if(treeRow==1) {
+                        lx = [W/2+20, W/2+150];
+                        xoff = 20;
+                    }
+                    for(var ntree=0; ntree<4; ntree++) {
+                        var y = H/2 + ntree*1.0/3*H/2 + ntim*2 - 2;
+                        if(y>H) y = H/2 + (y-H)%(H/2); // circle back for continuous trees
+                        var ssc = (y-H/2)/(H/2); // size scale for 3D perspective (bigger when nearer)
+                        var ysz = 60*ssc+5;
+                        var x = (y-ly[1])*1.0/(ly[0]-ly[1])*(lx[0]-lx[1]) +lx[1];
+                        ctx.fillStyle = "brown";
+                        var tw = ssc*5+2; // trunk width
+                        ctx.fillRect(x+xoff,y-ysz,tw,ysz);
+                        ctx.fillStyle = "darkgreen";
+                        ctx.beginPath()
+                        var rad = Math.max(2,20*ssc);
+                        ctx.arc(x+xoff+tw/2.0,y-ysz,rad,0,2*Math.PI);
+                        ctx.closePath()
+                        ctx.fill();
+                    }            
+                }    
+            }
+
+            function drawOne() {
+                ntim = parseInt(elRange.value); 
+                elInfo.innerHTML = "Info: "+ntim+'/'+data.length+", ";
+                elInfo.innerHTML += " meta=";
+                for(var n=2; n<data[ntim].length; n++) elInfo.innerHTML += data[ntim][n]+" | "; 
+                ctx.clearRect(0,0,W+10,H);
+                drawBasicScene();
+                if(ntim>0) {
+                    bboxes = data[ntim-1][1];
+                    for(var n=0;n<bboxes.length;n++) {
+                        drawOutline(bboxes[n][0],bboxes[n][1],bboxes[n][2],bboxes[n][3]);
+                    }
+                }
+                bboxes = data[ntim][1];
+                for(var n=0;n<bboxes.length;n++) {
+                    drawFill(bboxes[n][0],bboxes[n][1],bboxes[n][2],bboxes[n][3]);
+                }
+            }
+
+            function anim() {
+                drawOne();
+                var cn = parseInt(elRange.value);
+                if((cn+1)>=data.length) {
+                    return;
+                }
+                elRange.value = cn+1;
+                dt = (data[cn+1][0] - data[cn][0]);
+                dt = Math.round(dt*1000);
+                if(dt>1000) dt=1000;
+                elInfo.innerHTML += ", next frame after "+dt+" ms, ";
+                // console.info(""+cn+", "+dt);
+                atim = setTimeout(anim, dt);
+            }
+
+            function loadEntry() {
+                var nent = document.getElementById("nfil").value;
+                document.getElementById("data").value = JSON.stringify(allAlerts[nent]);
+                runSim();
+            }
+
+            function toggleAnim() {
+                if(document.getElementById("toggleAnim").checked) {
+                    // console.info("start animation");
+                    anim();
+                }
+                else clearInterval(atim);
+            }
+        </script>
+    </head>
+    <body onload="init()">
+        <div style="width:480px;margin:5px;">
+            <h1 style="">Visualize Collision Logs</h1>
+            
+            <div style="width:100%;float:left;">
+            <canvas id="canvas2d" width="480" height="270" style="margin:0px;border:solid black 1px;"></canvas>
+            <div id="info"  style="width:100%;margin:5px;background-color:lightgray;display: block;margin:0px;z-index:100;">
+        </div>
+        </div>
+        <div style="float:left;margin:5px;">
+            Entry: <input id="nfil" type="number" value=0 min=0 max=10 style="width:70px;margin:5px;" onchange="loadEntry()"></input>
+            <a id="totalEntries"></a>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+            <input type="checkbox" id="toggleAnim" onchange="toggleAnim()" style="margin:5px;">Animate</input>
+            &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+            <input type="range" id="range" min="0" max="100" value="0" onchange="drawOne()"></input>
+        </div>
+        <input type="text" id="data" style="margin:5px;width:100%;height:20px;padding:5px;display:inline;"></input>
+        <!--<input type="text" id="notes" style="margin:5px;width:100%;height:20px;padding:5px;"></input>
+        <button onclick="addNote()" style="margin:5px;">Add Note</button>
+        !-->
+    </div>
+    </body>
+</html>
