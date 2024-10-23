@@ -2,10 +2,10 @@
     <head>
         <style> 
         </style>
-        <script src="allAlerts.js"></script>
+        <script src="../allAlerts.js"></script>
         <script>
             var elInfo, elRange, ctx, data, ntim, atim, adata;
-            var W=470, H=280; // display size
+            var W=475, H=270; // display size
             var oW=1890, oH=1080; // original image size
             var scx = W*1.0/oW;
             var scy = H*1.0/oH;
@@ -18,7 +18,10 @@
             }
 
             function init() {
-                ctx = document.getElementById("canvas2d").getContext("2d");
+                var canvas = document.getElementById("canvas2d");
+                canvas.width = W;
+                canvas.height = H;
+                ctx = canvas.getContext("2d");
                 elInfo = document.getElementById("info");
                 elRange = document.getElementById("range");
                 document.getElementById("totalEntries").innerHTML = '/ '+allAlerts.length;   
@@ -82,10 +85,12 @@
                     var bboxes = [];
                     for(var nbox=2; nbox<splits.length; nbox++) bboxes.push(parseBBox(splits[nbox]));
                     var ct = getTime(n);
-                    var info = [ct, bboxes, data[n]['speed'], data[n]['distance'], parseFloat(splits[0])];
+                    // time, [bboxes], speed, distance, ttc
+                    var info = [ct, bboxes, data[n]['speed'], data[n]['distance'], parseFloat(splits[0])];                    
                     tmpData.push(info);
                     // console.info(tmpData.length);
                 }
+                tmpData.sort(function(x,y){return x[0]-y[0];}); //sort by time
                 return tmpData;
             }
 
@@ -138,9 +143,10 @@
 
             function drawOne() {
                 ntim = parseInt(elRange.value); 
-                elInfo.innerHTML = "Info: "+ntim+'/'+data.length+", ";
-                elInfo.innerHTML += " meta=";
+                elInfo.innerHTML = "Frame: "+ntim+'/'+data.length+", ";
+                elInfo.innerHTML += " S|D|TTC|Ys : ";
                 for(var n=2; n<data[ntim].length; n++) elInfo.innerHTML += data[ntim][n]+" | "; 
+                
                 ctx.clearRect(0,0,W+10,H);
                 drawBasicScene();
                 if(ntim>0) {
@@ -153,6 +159,8 @@
                 for(var n=0;n<bboxes.length;n++) {
                     drawFill(bboxes[n][0],bboxes[n][1],bboxes[n][2],bboxes[n][3]);
                 }
+                elInfo.innerHTML += bboxes[0][3] + " | " + bboxes[0][1];
+                
             }
 
             function anim() {
@@ -183,6 +191,14 @@
                 }
                 else clearInterval(atim);
             }
+
+            function addData() {
+                var fil = prompt("enter js file");
+                var scr = document.createElement("script");
+                scr.src = fil;
+                scr.onload = init;
+                document.head.appendChild(scr);
+            }
         </script>
     </head>
     <body onload="init()">
@@ -191,8 +207,8 @@
             
             <div style="width:100%;float:left;">
             <canvas id="canvas2d" width="480" height="270" style="margin:0px;border:solid black 1px;"></canvas>
-            <div id="info"  style="width:100%;margin:5px;background-color:lightgray;display: block;margin:0px;z-index:100;">
-        </div>
+            <div id="info"  style="width:100%;margin:5px;background-color:lightgray;display: block;margin:0px;z-index:100;"></div>
+            
         </div>
         <div style="float:left;margin:5px;">
             Entry: <input id="nfil" type="number" value=0 min=0 max=10 style="width:70px;margin:5px;" onchange="loadEntry()"></input>
@@ -205,6 +221,7 @@
         <!--<input type="text" id="notes" style="margin:5px;width:100%;height:20px;padding:5px;"></input>
         <button onclick="addNote()" style="margin:5px;">Add Note</button>
         !-->
+        <button onclick="addData()">Add Data</button>
     </div>
     </body>
 </html>
